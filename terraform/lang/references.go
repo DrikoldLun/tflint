@@ -3,8 +3,6 @@ package lang
 import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/terraform-linters/tflint/terraform/addrs"
-	"github.com/terraform-linters/tflint/terraform/configs/configschema"
-	"github.com/terraform-linters/tflint/terraform/lang/blocktoattr"
 	"github.com/terraform-linters/tflint/terraform/tfdiags"
 )
 
@@ -39,34 +37,6 @@ func References(traversals []hcl.Traversal) ([]*addrs.Reference, tfdiags.Diagnos
 	}
 
 	return refs, diags
-}
-
-// ReferencesInBlock is a helper wrapper around References that first searches
-// the given body for traversals, before converting those traversals to
-// references.
-//
-// A block schema must be provided so that this function can determine where in
-// the body variables are expected.
-func ReferencesInBlock(body hcl.Body, schema *configschema.Block) ([]*addrs.Reference, tfdiags.Diagnostics) {
-	if body == nil {
-		return nil, nil
-	}
-
-	// We use blocktoattr.ExpandedVariables instead of hcldec.Variables or
-	// dynblock.VariablesHCLDec here because when we evaluate a block we'll
-	// first apply the dynamic block extension and _then_ the blocktoattr
-	// transform, and so blocktoattr.ExpandedVariables takes into account
-	// both of those transforms when it analyzes the body to ensure we find
-	// all of the references as if they'd already moved into their final
-	// locations, even though we can't expand dynamic blocks yet until we
-	// already know which variables are required.
-	//
-	// The set of cases we want to detect here is covered by the tests for
-	// the plan graph builder in the main 'terraform' package, since it's
-	// in a better position to test this due to having mock providers etc
-	// available.
-	traversals := blocktoattr.ExpandedVariables(body, schema)
-	return References(traversals)
 }
 
 // ReferencesInExpr is a helper wrapper around References that first searches

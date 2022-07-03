@@ -4,70 +4,11 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/hcl/v2/ext/dynblock"
-	"github.com/hashicorp/hcl/v2/hcldec"
 	"github.com/terraform-linters/tflint/terraform/addrs"
-	"github.com/terraform-linters/tflint/terraform/configs/configschema"
-	"github.com/terraform-linters/tflint/terraform/lang/blocktoattr"
 	"github.com/terraform-linters/tflint/terraform/tfdiags"
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/convert"
 )
-
-// ExpandBlock expands any "dynamic" blocks present in the given body. The
-// result is a body with those blocks expanded, ready to be evaluated with
-// EvalBlock.
-//
-// If the returned diagnostics contains errors then the result may be
-// incomplete or invalid.
-func (s *Scope) ExpandBlock(body hcl.Body, schema *configschema.Block) (hcl.Body, tfdiags.Diagnostics) {
-	spec := schema.DecoderSpec()
-
-	traversals := dynblock.ExpandVariablesHCLDec(body, spec)
-	refs, diags := References(traversals)
-
-	ctx, ctxDiags := s.EvalContext(refs)
-	diags = diags.Append(ctxDiags)
-
-	return dynblock.Expand(body, ctx), diags
-}
-
-// EvalBlock evaluates the given body using the given block schema and returns
-// a cty object value representing its contents. The type of the result conforms
-// to the implied type of the given schema.
-//
-// This function does not automatically expand "dynamic" blocks within the
-// body. If that is desired, first call the ExpandBlock method to obtain
-// an expanded body to pass to this method.
-//
-// If the returned diagnostics contains errors then the result may be
-// incomplete or invalid.
-func (s *Scope) EvalBlock(body hcl.Body, schema *configschema.Block) (cty.Value, tfdiags.Diagnostics) {
-	spec := schema.DecoderSpec()
-
-	refs, diags := ReferencesInBlock(body, schema)
-
-	ctx, ctxDiags := s.EvalContext(refs)
-	diags = diags.Append(ctxDiags)
-	if diags.HasErrors() {
-		// We'll stop early if we found problems in the references, because
-		// it's likely evaluation will produce redundant copies of the same errors.
-		return cty.UnknownVal(schema.ImpliedType()), diags
-	}
-
-	// HACK: In order to remain compatible with some assumptions made in
-	// Terraform v0.11 and earlier about the approximate equivalence of
-	// attribute vs. block syntax, we do a just-in-time fixup here to allow
-	// any attribute in the schema that has a list-of-objects or set-of-objects
-	// kind to potentially be populated instead by one or more nested blocks
-	// whose type is the attribute name.
-	body = blocktoattr.FixUpBlockAttrs(body, schema)
-
-	val, evalDiags := hcldec.Decode(body, spec, ctx)
-	diags = diags.Append(evalDiags)
-
-	return val, diags
-}
 
 // EvalExpr evaluates a single expression in the receiving context and returns
 // the resulting value. The value will be converted to the given type before

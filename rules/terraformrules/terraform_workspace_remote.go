@@ -49,14 +49,15 @@ func (r *TerraformWorkspaceRemoteRule) Check(runner *tflint.Runner) error {
 
 	log.Printf("[TRACE] Check `%s` rule for `%s` runner", r.Name(), runner.TFConfigPath())
 
-	backend := runner.TFConfig.Root.Module.Backend
-	if backend == nil || backend.Type != "remote" {
-		return nil
-	}
+	// backend := runner.TFConfig.Root.Module.Backend
+	// if backend == nil || backend.Type != "remote" {
+	// 	return nil
+	// }
 
-	return runner.WalkExpressions(func(expr hcl.Expression) error {
-		return r.checkForTerraformWorkspaceInExpr(runner, expr)
-	})
+	// return runner.WalkExpressions(func(expr hcl.Expression) error {
+	// 	return r.checkForTerraformWorkspaceInExpr(runner, expr)
+	// })
+	return nil
 }
 
 func (r *TerraformWorkspaceRemoteRule) checkForTerraformWorkspaceInExpr(runner *tflint.Runner, expr hcl.Expression) error {

@@ -1,10 +1,8 @@
 package terraformrules
 
 import (
-	"fmt"
 	"log"
 
-	"github.com/terraform-linters/tflint/terraform/configs"
 	"github.com/terraform-linters/tflint/tflint"
 )
 
@@ -45,51 +43,51 @@ func (r *TerraformUnusedRequiredProvidersRule) Check(runner *tflint.Runner) erro
 
 	log.Printf("[TRACE] Check `%s` rule for `%s` runner", r.Name(), runner.TFConfigPath())
 
-	for _, required := range runner.TFConfig.Module.ProviderRequirements.RequiredProviders {
-		r.checkProvider(runner, required)
-	}
+	// for _, required := range runner.TFConfig.Module.ProviderRequirements.RequiredProviders {
+	// 	r.checkProvider(runner, required)
+	// }
 
 	return nil
 }
 
-func (r *TerraformUnusedRequiredProvidersRule) checkProvider(runner *tflint.Runner, required *configs.RequiredProvider) {
-	for _, resource := range runner.TFConfig.Module.ManagedResources {
-		if r.usesProvider(resource, required) {
-			return
-		}
-	}
+// func (r *TerraformUnusedRequiredProvidersRule) checkProvider(runner *tflint.Runner, required *configs.RequiredProvider) {
+// for _, resource := range runner.TFConfig.Module.ManagedResources {
+// 	if r.usesProvider(resource, required) {
+// 		return
+// 	}
+// }
 
-	for _, resource := range runner.TFConfig.Module.DataResources {
-		if r.usesProvider(resource, required) {
-			return
-		}
-	}
+// for _, resource := range runner.TFConfig.Module.DataResources {
+// 	if r.usesProvider(resource, required) {
+// 		return
+// 	}
+// }
 
-	for _, provider := range runner.TFConfig.Module.ProviderConfigs {
-		if required.Name == provider.Name {
-			return
-		}
-	}
+// for _, provider := range runner.TFConfig.Module.ProviderConfigs {
+// 	if required.Name == provider.Name {
+// 		return
+// 	}
+// }
 
-	for _, module := range runner.TFConfig.Module.ModuleCalls {
-		for _, provider := range module.Providers {
-			if provider.InParent.Name == required.Name {
-				return
-			}
-		}
-	}
+// for _, module := range runner.TFConfig.Module.ModuleCalls {
+// 	for _, provider := range module.Providers {
+// 		if provider.InParent.Name == required.Name {
+// 			return
+// 		}
+// 	}
+// }
 
-	runner.EmitIssue(
-		r,
-		fmt.Sprintf("provider '%s' is declared in required_providers but not used by the module", required.Name),
-		required.DeclRange,
-	)
-}
+// runner.EmitIssue(
+// 	r,
+// 	fmt.Sprintf("provider '%s' is declared in required_providers but not used by the module", required.Name),
+// 	required.DeclRange,
+// )
+// }
 
-func (r *TerraformUnusedRequiredProvidersRule) usesProvider(resource *configs.Resource, required *configs.RequiredProvider) bool {
-	if resource.ProviderConfigRef != nil {
-		return resource.ProviderConfigRef.Name == required.Name
-	}
+// func (r *TerraformUnusedRequiredProvidersRule) usesProvider(resource *configs.Resource, required *configs.RequiredProvider) bool {
+// 	if resource.ProviderConfigRef != nil {
+// 		return resource.ProviderConfigRef.Name == required.Name
+// 	}
 
-	return resource.Provider.Type == required.Name
-}
+// 	return resource.Provider.Type == required.Name
+// }

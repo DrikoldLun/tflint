@@ -4,89 +4,48 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/agext/levenshtein"
 	"github.com/hashicorp/hcl/v2"
-	"github.com/zclconf/go-cty/cty"
-
 	"github.com/terraform-linters/tflint/terraform/addrs"
-	"github.com/terraform-linters/tflint/terraform/configs"
-	"github.com/terraform-linters/tflint/terraform/instances"
 	"github.com/terraform-linters/tflint/terraform/lang"
 	"github.com/terraform-linters/tflint/terraform/lang/marks"
 	"github.com/terraform-linters/tflint/terraform/tfdiags"
+	"github.com/zclconf/go-cty/cty"
 )
 
-// Evaluator provides the necessary contextual data for evaluating expressions
-// for a particular walk operation.
+type ContextMeta struct {
+	Env                string
+	OriginalWorkingDir string
+}
+
 type Evaluator struct {
-	// Meta is contextual metadata about the current operation.
-	Meta *ContextMeta
-
-	// Config is the root node in the configuration tree.
-	Config *configs.Config
-
-	// VariableValues is a map from variable names to their associated values,
-	// within the module indicated by ModulePath. VariableValues is modified
-	// concurrently, and so it must be accessed only while holding
-	// VariableValuesLock.
-	//
-	// The first map level is string representations of addr.ModuleInstance
-	// values, while the second level is variable names.
-	VariableValues     map[string]map[string]cty.Value
-	VariableValuesLock *sync.Mutex
+	Meta           *ContextMeta
+	ModulePath     addrs.ModuleInstance
+	Config         *Config
+	VariableValues map[string]map[string]cty.Value
 }
 
-// Scope creates an evaluation scope for the given module path and optional
-// resource.
-//
-// If the "self" argument is nil then the "self" object is not available
-// in evaluated expressions. Otherwise, it behaves as an alias for the given
-// address.
-func (e *Evaluator) Scope(data lang.Data, self addrs.Referenceable) *lang.Scope {
-	return &lang.Scope{
-		Data:     data,
-		SelfAddr: self,
-		PureOnly: true,
-		BaseDir:  ".", // Always current working directory for now.
+func (e *Evaluator) EvaluateExpr(expr hcl.Expression, wantType cty.Type) (cty.Value, tfdiags.Diagnostics) {
+	scope := &lang.Scope{
+		Data: &evaluationData{
+			Evaluator:  e,
+			ModulePath: e.ModulePath,
+		},
 	}
+	return scope.EvalExpr(expr, wantType)
 }
 
-// evaluationStateData is an implementation of lang.Data that resolves
-// references primarily (but not exclusively) using information from a State.
-type evaluationStateData struct {
-	Evaluator *Evaluator
-
-	// ModulePath is the path through the dynamic module tree to the module
-	// that references will be resolved relative to.
+type evaluationData struct {
+	Evaluator  *Evaluator
 	ModulePath addrs.ModuleInstance
-
-	// InstanceKeyData describes the values, if any, that are accessible due
-	// to repetition of a containing object using "count" or "for_each"
-	// arguments. (It is _not_ used for the for_each inside "dynamic" blocks,
-	// since the user specifies in that case which variable name to locally
-	// shadow.)
-	InstanceKeyData InstanceKeyEvalData
 }
 
-// InstanceKeyEvalData is the old name for instances.RepetitionData, aliased
-// here for compatibility. In new code, use instances.RepetitionData instead.
-type InstanceKeyEvalData = instances.RepetitionData
+var _ lang.Data = (*evaluationData)(nil)
 
-// EvalDataForNoInstanceKey is a value of InstanceKeyData that sets no instance
-// key values at all, suitable for use in contexts where no keyed instance
-// is relevant.
-var EvalDataForNoInstanceKey = InstanceKeyEvalData{}
-
-// evaluationStateData must implement lang.Data
-var _ lang.Data = (*evaluationStateData)(nil)
-
-func (d *evaluationStateData) GetInputVariable(addr addrs.InputVariable, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
+func (d *evaluationData) GetInputVariable(addr addrs.InputVariable, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
 	var diags tfdiags.Diagnostics
 
-	// First we'll make sure the requested value is declared in configuration,
-	// so we can produce a nice message if not.
 	moduleConfig := d.Evaluator.Config.DescendentForInstance(d.ModulePath)
 	if moduleConfig == nil {
 		// should never happen, since we can't be evaluating in a module
@@ -115,8 +74,6 @@ func (d *evaluationStateData) GetInputVariable(addr addrs.InputVariable, rng tfd
 		})
 		return cty.DynamicVal, diags
 	}
-	d.Evaluator.VariableValuesLock.Lock()
-	defer d.Evaluator.VariableValuesLock.Unlock()
 
 	moduleAddrStr := d.ModulePath.String()
 	vals := d.Evaluator.VariableValues[moduleAddrStr]
@@ -140,11 +97,8 @@ func (d *evaluationStateData) GetInputVariable(addr addrs.InputVariable, rng tfd
 		diags = diags.Append(&hcl.Diagnostic{
 			Severity: hcl.DiagError,
 			Summary:  `Reference to unresolved input variable`,
-			Detail: fmt.Sprintf(
-				`The final value for %s is missing in Terraform's evaluation context. This is a bug in Terraform; please report it!`,
-				addr.Absolute(d.ModulePath),
-			),
-			Subject: rng.ToHCL().Ptr(),
+			Detail:   `The final value is missing in Terraform's evaluation context. This is a bug in Terraform; please report it!`,
+			Subject:  rng.ToHCL().Ptr(),
 		})
 		val = cty.UnknownVal(config.Type)
 	}
@@ -157,7 +111,7 @@ func (d *evaluationStateData) GetInputVariable(addr addrs.InputVariable, rng tfd
 	return val, diags
 }
 
-func (d *evaluationStateData) GetPathAttr(addr addrs.PathAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
+func (d *evaluationData) GetPathAttr(addr addrs.PathAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
 	var diags tfdiags.Diagnostics
 	switch addr.Name {
 
@@ -226,7 +180,7 @@ func (d *evaluationStateData) GetPathAttr(addr addrs.PathAttr, rng tfdiags.Sourc
 	}
 }
 
-func (d *evaluationStateData) GetTerraformAttr(addr addrs.TerraformAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
+func (d *evaluationData) GetTerraformAttr(addr addrs.TerraformAttr, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
 	var diags tfdiags.Diagnostics
 	switch addr.Name {
 

@@ -1,12 +1,47 @@
-package configs
+package terraform
 
 import (
 	"sort"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/terraform-linters/tflint/terraform/addrs"
 )
+
+// A Config is a node in the tree of modules within a configuration.
+//
+// The module tree is constructed by following ModuleCall instances recursively
+// through the root module transitively into descendent modules.
+type Config struct {
+	// RootModule points to the Config for the root module within the same
+	// module tree as this module. If this module _is_ the root module then
+	// this is self-referential.
+	Root *Config
+
+	// Path is a sequence of module logical names that traverse from the root
+	// module to this config. Path is empty for the root module.
+	Path addrs.Module
+
+	// ChildModules points to the Config for each of the direct child modules
+	// called from this module. The keys in this map match the keys in
+	// Module.ModuleCalls.
+	Children map[string]*Config
+
+	// Module points to the object describing the configuration for the
+	// various elements (variables, resources, etc) defined by this module.
+	Module *Module
+}
+
+// NewEmptyConfig constructs a single-node configuration tree with an empty
+// root module. This is generally a pretty useless thing to do, so most callers
+// should instead use BuildConfig.
+func NewEmptyConfig() *Config {
+	ret := &Config{}
+	ret.Root = ret
+	ret.Children = make(map[string]*Config)
+	ret.Module = &Module{}
+	return ret
+}
 
 // BuildConfig constructs a Config from a root module by loading all of its
 // descendent modules via the given ModuleWalker.
@@ -22,16 +57,6 @@ func BuildConfig(root *Module, walker ModuleWalker) (*Config, hcl.Diagnostics) {
 	}
 	cfg.Root = cfg // Root module is self-referential.
 	cfg.Children, diags = buildChildModules(cfg, walker)
-
-	// Skip provider resolution if there are any errors, since the provider
-	// configurations themselves may not be valid.
-	if !diags.HasErrors() {
-		// Now that the config is built, we can connect the provider names to all
-		// the known types for validation.
-		cfg.resolveProviderTypes()
-	}
-
-	diags = append(diags, validateProviderConfigs(nil, cfg, nil)...)
 
 	return cfg, diags
 }
@@ -57,16 +82,12 @@ func buildChildModules(parent *Config, walker ModuleWalker) (map[string]*Config,
 		path[len(path)-1] = call.Name
 
 		req := ModuleRequest{
-			Name:              call.Name,
-			Path:              path,
-			SourceAddr:        call.SourceAddr,
-			SourceAddrRange:   call.SourceAddrRange,
-			VersionConstraint: call.Version,
-			Parent:            parent,
-			CallRange:         call.DeclRange,
+			Name:      call.Name,
+			Path:      path,
+			CallRange: call.DeclRange,
 		}
 
-		mod, ver, modDiags := walker.LoadModule(&req)
+		mod, _, modDiags := walker.LoadModule(&req)
 		diags = append(diags, modDiags...)
 		if mod == nil {
 			// nil can be returned if the source address was invalid and so
@@ -76,32 +97,31 @@ func buildChildModules(parent *Config, walker ModuleWalker) (map[string]*Config,
 		}
 
 		child := &Config{
-			Parent:          parent,
-			Root:            parent.Root,
-			Path:            path,
-			Module:          mod,
-			CallRange:       call.DeclRange,
-			SourceAddr:      call.SourceAddr,
-			SourceAddrRange: call.SourceAddrRange,
-			Version:         ver,
+			Root:   parent.Root,
+			Path:   path,
+			Module: mod,
 		}
 
 		child.Children, modDiags = buildChildModules(child, walker)
 		diags = append(diags, modDiags...)
 
-		if mod.Backend != nil {
-			diags = diags.Append(&hcl.Diagnostic{
-				Severity: hcl.DiagWarning,
-				Summary:  "Backend configuration ignored",
-				Detail:   "Any selected backend applies to the entire configuration, so Terraform expects provider configurations only in the root module.\n\nThis is a warning rather than an error because it's sometimes convenient to temporarily call a root module as a child module for testing purposes, but this backend configuration block will have no effect.",
-				Subject:  mod.Backend.DeclRange.Ptr(),
-			})
-		}
-
 		ret[call.Name] = child
 	}
 
 	return ret, diags
+}
+
+// DescendentForInstance returns the descendent config that has the given instance path
+// beneath the receiver, or nil if there is no such module.
+func (c *Config) DescendentForInstance(path addrs.ModuleInstance) *Config {
+	current := c
+	for _, step := range path {
+		current = current.Children[step.Name]
+		if current == nil {
+			return nil
+		}
+	}
+	return current
 }
 
 // A ModuleWalker knows how to find and load a child module given details about
@@ -137,8 +157,7 @@ type ModuleRequest struct {
 	// Name is the "logical name" of the module call within configuration.
 	// This is provided in case the name is used as part of a storage key
 	// for the module, but implementations must otherwise treat it as an
-	// opaque string. It is guaranteed to have already been validated as an
-	// HCL identifier and UTF-8 encoded.
+	// opaque string.
 	Name string
 
 	// Path is a list of logical names that traverse from the root module to
@@ -147,54 +166,8 @@ type ModuleRequest struct {
 	// calls with the same name at different points in the tree.
 	Path addrs.Module
 
-	// SourceAddr is the source address string provided by the user in
-	// configuration.
-	SourceAddr addrs.ModuleSource
-
-	// SourceAddrRange is the source range for the SourceAddr value as it
-	// was provided in configuration. This can and should be used to generate
-	// diagnostics about the source address having invalid syntax, referring
-	// to a non-existent object, etc.
-	SourceAddrRange hcl.Range
-
-	// VersionConstraint is the version constraint applied to the module in
-	// configuration. This data structure includes the source range for
-	// the constraint, which can and should be used to generate diagnostics
-	// about constraint-related issues, such as constraints that eliminate all
-	// available versions of a module whose source is otherwise valid.
-	VersionConstraint VersionConstraint
-
-	// Parent is the partially-constructed module tree node that the loaded
-	// module will be added to. Callers may refer to any field of this
-	// structure except Children, which is still under construction when
-	// ModuleRequest objects are created and thus has undefined content.
-	// The main reason this is provided is so that full module paths can
-	// be constructed for uniqueness.
-	Parent *Config
-
 	// CallRange is the source range for the header of the "module" block
 	// in configuration that prompted this request. This can be used as the
-	// subject of an error diagnostic that relates to the module call itself,
-	// rather than to either its source address or its version number.
+	// subject of an error diagnostic that relates to the module call itself.
 	CallRange hcl.Range
-}
-
-// DisabledModuleWalker is a ModuleWalker that doesn't support
-// child modules at all, and so will return an error if asked to load one.
-//
-// This is provided primarily for testing. There is no good reason to use this
-// in the main application.
-var DisabledModuleWalker ModuleWalker
-
-func init() {
-	DisabledModuleWalker = ModuleWalkerFunc(func(req *ModuleRequest) (*Module, *version.Version, hcl.Diagnostics) {
-		return nil, nil, hcl.Diagnostics{
-			{
-				Severity: hcl.DiagError,
-				Summary:  "Child modules are not supported",
-				Detail:   "Child module calls are not allowed in this context.",
-				Subject:  &req.CallRange,
-			},
-		}
-	})
 }

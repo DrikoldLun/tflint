@@ -9,7 +9,7 @@ import (
 
 	"github.com/terraform-linters/tflint-plugin-sdk/hclext"
 	sdk "github.com/terraform-linters/tflint-plugin-sdk/tflint"
-	"github.com/terraform-linters/tflint/terraform/terraform"
+	"github.com/terraform-linters/tflint/terraform"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -727,8 +727,7 @@ resource "null_resource" "test" {
 			InputValues: []terraform.InputValues{
 				{
 					"instance_type": &terraform.InputValue{
-						Value:      cty.StringVal("c5.2xlarge"),
-						SourceType: terraform.ValueFromNamedFile,
+						Value: cty.StringVal("c5.2xlarge"),
 					},
 				},
 			},
@@ -745,14 +744,12 @@ resource "null_resource" "test" {
 			InputValues: []terraform.InputValues{
 				{
 					"instance_type": &terraform.InputValue{
-						Value:      cty.StringVal("c5.2xlarge"),
-						SourceType: terraform.ValueFromNamedFile,
+						Value: cty.StringVal("c5.2xlarge"),
 					},
 				},
 				{
 					"instance_type": &terraform.InputValue{
-						Value:      cty.StringVal("p3.8xlarge"),
-						SourceType: terraform.ValueFromNamedFile,
+						Value: cty.StringVal("p3.8xlarge"),
 					},
 				},
 			},

@@ -86,72 +86,72 @@ func (r *TerraformNamingConventionRule) Check(runner *tflint.Runner) error {
 		return err
 	}
 
-	defaultNameValidator, err := config.getNameValidator()
-	if err != nil {
-		return fmt.Errorf("Invalid default configuration: %v", err)
-	}
+	// defaultNameValidator, err := config.getNameValidator()
+	// if err != nil {
+	// 	return fmt.Errorf("Invalid default configuration: %v", err)
+	// }
 
-	var nameValidator *NameValidator
+	// var nameValidator *NameValidator
 
 	// data
-	dataBlockName := "data"
-	nameValidator, err = config.Data.getNameValidator(defaultNameValidator, &config, dataBlockName)
-	if err != nil {
-		return err
-	}
-	for _, target := range runner.TFConfig.Module.DataResources {
-		nameValidator.checkBlock(runner, r, dataBlockName, target.Name, &target.DeclRange)
-	}
+	// dataBlockName := "data"
+	// nameValidator, err = config.Data.getNameValidator(defaultNameValidator, &config, dataBlockName)
+	// if err != nil {
+	// 	return err
+	// }
+	// for _, target := range runner.TFConfig.Module.DataResources {
+	// 	nameValidator.checkBlock(runner, r, dataBlockName, target.Name, &target.DeclRange)
+	// }
 
 	// locals
-	localBlockName := "local value"
-	nameValidator, err = config.Locals.getNameValidator(defaultNameValidator, &config, localBlockName)
-	if err != nil {
-		return err
-	}
-	for _, target := range runner.TFConfig.Module.Locals {
-		nameValidator.checkBlock(runner, r, localBlockName, target.Name, &target.DeclRange)
-	}
+	// localBlockName := "local value"
+	// nameValidator, err = config.Locals.getNameValidator(defaultNameValidator, &config, localBlockName)
+	// if err != nil {
+	// 	return err
+	// }
+	// for _, target := range runner.TFConfig.Module.Locals {
+	// 	nameValidator.checkBlock(runner, r, localBlockName, target.Name, &target.DeclRange)
+	// }
 
 	// modules
-	moduleBlockName := "module"
-	nameValidator, err = config.Module.getNameValidator(defaultNameValidator, &config, moduleBlockName)
-	if err != nil {
-		return err
-	}
-	for _, target := range runner.TFConfig.Module.ModuleCalls {
-		nameValidator.checkBlock(runner, r, moduleBlockName, target.Name, &target.DeclRange)
-	}
+	// moduleBlockName := "module"
+	// nameValidator, err = config.Module.getNameValidator(defaultNameValidator, &config, moduleBlockName)
+	// if err != nil {
+	// 	return err
+	// }
+	// for _, target := range runner.TFConfig.Module.ModuleCalls {
+	// 	nameValidator.checkBlock(runner, r, moduleBlockName, target.Name, &target.DeclRange)
+	// }
 
 	// outputs
-	outputBlockName := "output"
-	nameValidator, err = config.Output.getNameValidator(defaultNameValidator, &config, outputBlockName)
-	if err != nil {
-		return err
-	}
-	for _, target := range runner.TFConfig.Module.Outputs {
-		nameValidator.checkBlock(runner, r, outputBlockName, target.Name, &target.DeclRange)
-	}
+	// outputBlockName := "output"
+	// nameValidator, err = config.Output.getNameValidator(defaultNameValidator, &config, outputBlockName)
+	// if err != nil {
+	// 	return err
+	// }
+	// for _, target := range runner.TFConfig.Module.Outputs {
+	// 	nameValidator.checkBlock(runner, r, outputBlockName, target.Name, &target.DeclRange)
+	// }
 
 	// resources
-	resourceBlockName := "resource"
-	nameValidator, err = config.Resource.getNameValidator(defaultNameValidator, &config, resourceBlockName)
-	if err != nil {
-		return err
-	}
-	for _, target := range runner.TFConfig.Module.ManagedResources {
-		nameValidator.checkBlock(runner, r, resourceBlockName, target.Name, &target.DeclRange)
-	}
+	// resourceBlockName := "resource"
+	// nameValidator, err = config.Resource.getNameValidator(defaultNameValidator, &config, resourceBlockName)
+	// if err != nil {
+	// 	return err
+	// }
+	// for _, target := range runner.TFConfig.Module.ManagedResources {
+	// 	nameValidator.checkBlock(runner, r, resourceBlockName, target.Name, &target.DeclRange)
+	// }
 
 	// variables
-	variableBlockName := "variable"
-	nameValidator, err = config.Variable.getNameValidator(defaultNameValidator, &config, variableBlockName)
-	if err != nil {
-		return err
-	}
-	for _, target := range runner.TFConfig.Module.Variables {
-		nameValidator.checkBlock(runner, r, variableBlockName, target.Name, &target.DeclRange)
-	}
+	// variableBlockName := "variable"
+	// nameValidator, err = config.Variable.getNameValidator(defaultNameValidator, &config, variableBlockName)
+	// if err != nil {
+	// 	return err
+	// }
+	// for _, target := range runner.TFConfig.Module.Variables {
+	// 	nameValidator.checkBlock(runner, r, variableBlockName, target.Name, &target.DeclRange)
+	// }
 
 	return nil
 }

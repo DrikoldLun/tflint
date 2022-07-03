@@ -46,9 +46,9 @@ func (r *TerraformTypedVariablesRule) Check(runner *tflint.Runner) error {
 	log.Printf("[TRACE] Check `%s` rule for `%s` runner", r.Name(), runner.TFConfigPath())
 
 	files := make(map[string]*struct{})
-	for _, variable := range runner.TFConfig.Module.Variables {
-		files[variable.DeclRange.Filename] = nil
-	}
+	// for _, variable := range runner.TFConfig.Module.Variables {
+	// 	files[variable.DeclRange.Filename] = nil
+	// }
 
 	for filename := range files {
 		if err := r.checkFileSchema(runner, filename); err != nil {

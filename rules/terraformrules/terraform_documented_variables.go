@@ -1,7 +1,6 @@
 package terraformrules
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/terraform-linters/tflint/tflint"
@@ -44,15 +43,15 @@ func (r *TerraformDocumentedVariablesRule) Check(runner *tflint.Runner) error {
 
 	log.Printf("[TRACE] Check `%s` rule for `%s` runner", r.Name(), runner.TFConfigPath())
 
-	for _, variable := range runner.TFConfig.Module.Variables {
-		if variable.Description == "" {
-			runner.EmitIssue(
-				r,
-				fmt.Sprintf("`%s` variable has no description", variable.Name),
-				variable.DeclRange,
-			)
-		}
-	}
+	// for _, variable := range runner.TFConfig.Module.Variables {
+	// 	if variable.Description == "" {
+	// 		runner.EmitIssue(
+	// 			r,
+	// 			fmt.Sprintf("`%s` variable has no description", variable.Name),
+	// 			variable.DeclRange,
+	// 		)
+	// 	}
+	// }
 
 	return nil
 }
