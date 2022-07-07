@@ -48,7 +48,7 @@ func (r *TerraformAlphabeticOrderRule) Check(runner *tflint.Runner) error {
 	log.Printf("[TRACE] Check `%s` rule for `%s` runner", r.Name(), runner.TFConfigPath())
 
 	for name, file := range runner.Files() {
-		if err := r.checkAlphaSeq(runner, name, file); err != nil {
+		if err := r.checkAlphaOrder(runner, name, file); err != nil {
 			return err
 		}
 	}
@@ -56,7 +56,7 @@ func (r *TerraformAlphabeticOrderRule) Check(runner *tflint.Runner) error {
 	return nil
 }
 
-func (r *TerraformAlphabeticOrderRule) checkAlphaSeq(runner *tflint.Runner, filename string, file *hcl.File) error {
+func (r *TerraformAlphabeticOrderRule) checkAlphaOrder(runner *tflint.Runner, filename string, file *hcl.File) error {
 	if strings.HasSuffix(filename, ".json") {
 		return nil
 	}
