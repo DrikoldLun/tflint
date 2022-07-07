@@ -33,6 +33,7 @@ var DefaultRules = []Rule{
 	terraformrules.NewTerraformUnusedDeclarationsRule(),
 	terraformrules.NewTerraformUnusedRequiredProvidersRule(),
 	terraformrules.NewTerraformCommentSyntaxRule(),
+	terraformrules.NewTerraformAlphabeticOrderRule(),
 }
 
 // CheckRuleNames returns map of rules indexed by name
