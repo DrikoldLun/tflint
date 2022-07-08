@@ -69,7 +69,7 @@ func (r *TerraformAlphabeticOrderRule) checkAlphaOrder(runner *tflint.Runner, fi
 		if tokens[i].Type == hclsyntax.TokenIdent {
 			lastIdentToken = tokens[i]
 		} else if tokens[i].Type == hclsyntax.TokenOBrace {
-			i = r.checkAtrAlphaOrder(runner, lastIdentToken, tokens, i+1)
+			i = r.checkArgsAlphaOrder(runner, lastIdentToken, tokens, i+1)
 			if i == -1 {
 				return nil
 			}
@@ -78,7 +78,7 @@ func (r *TerraformAlphabeticOrderRule) checkAlphaOrder(runner *tflint.Runner, fi
 	return nil
 }
 
-func (r *TerraformAlphabeticOrderRule) checkAtrAlphaOrder(runner *tflint.Runner,
+func (r *TerraformAlphabeticOrderRule) checkArgsAlphaOrder(runner *tflint.Runner,
 	owner hclsyntax.Token, tokens hclsyntax.Tokens, startIndex int) int {
 	var lastIdentifierToken hclsyntax.Token
 	for i := startIndex; i < len(tokens); i++ {
@@ -86,7 +86,7 @@ func (r *TerraformAlphabeticOrderRule) checkAtrAlphaOrder(runner *tflint.Runner,
 			if lastIdentifierToken.Bytes != nil && string(lastIdentifierToken.Bytes) > string(tokens[i].Bytes) {
 				runner.EmitIssue(
 					r,
-					fmt.Sprintf("Attributes `%s` and `%s` are not sorted in alphabetic order",
+					fmt.Sprintf("Arguments `%s` and `%s` are not sorted in alphabetic order",
 						string(lastIdentifierToken.Bytes), string(tokens[i].Bytes)),
 					owner.Range,
 				)
@@ -94,7 +94,7 @@ func (r *TerraformAlphabeticOrderRule) checkAtrAlphaOrder(runner *tflint.Runner,
 			}
 			lastIdentifierToken = tokens[i]
 		} else if tokens[i].Type == hclsyntax.TokenOBrace {
-			i = r.checkAtrAlphaOrder(runner, lastIdentifierToken, tokens, i+1)
+			i = r.checkArgsAlphaOrder(runner, lastIdentifierToken, tokens, i+1)
 			if i == -1 {
 				return -1
 			}
