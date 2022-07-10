@@ -5,8 +5,11 @@ import (
 	"log"
 	"regexp"
 
-	"github.com/terraform-linters/tflint/terraform/addrs"
-	"github.com/terraform-linters/tflint/terraform/configs"
+	"github.com/hashicorp/go-version"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	tfaddr "github.com/hashicorp/terraform-registry-address"
+	"github.com/terraform-linters/tflint-plugin-sdk/hclext"
+	sdk "github.com/terraform-linters/tflint-plugin-sdk/tflint"
 	"github.com/terraform-linters/tflint/tflint"
 )
 
@@ -20,6 +23,14 @@ type TerraformModuleVersionRule struct{}
 // TerraformModuleVersionRuleConfig is the config structure for the TerraformModuleVersionRule rule
 type TerraformModuleVersionRuleConfig struct {
 	Exact bool `hcl:"exact,optional"`
+}
+type terraformModuleVersionRuleModuleCall struct {
+	name        string
+	source      string
+	sourceAttr  *hclext.Attribute
+	version     version.Constraints
+	versionAttr *hclext.Attribute
+	block       *hclext.Block
 }
 
 // NewTerraformModuleVersionRule returns a new rule
@@ -62,7 +73,55 @@ func (r *TerraformModuleVersionRule) Check(runner *tflint.Runner) error {
 		return err
 	}
 
-	for _, module := range runner.TFConfig.Module.ModuleCalls {
+	body, diags := runner.GetModuleContent(&hclext.BodySchema{
+		Blocks: []hclext.BlockSchema{
+			{
+				Type:       "module",
+				LabelNames: []string{"name"},
+				Body: &hclext.BodySchema{
+					Attributes: []hclext.AttributeSchema{
+						{Name: "source"},
+						{Name: "version"},
+					},
+				},
+			},
+		},
+	}, sdk.GetModuleContentOption{})
+	if diags.HasErrors() {
+		return diags
+	}
+
+	for _, block := range body.Blocks {
+		sourceAttr, exists := block.Body.Attributes["source"]
+		if !exists {
+			continue
+		}
+
+		var source string
+		if diags := gohcl.DecodeExpression(sourceAttr.Expr, nil, &source); diags.HasErrors() {
+			return diags
+		}
+
+		module := &terraformModuleVersionRuleModuleCall{
+			name:       block.Labels[0],
+			source:     source,
+			sourceAttr: sourceAttr,
+			block:      block,
+		}
+
+		if versionAttr, exists := block.Body.Attributes["version"]; exists {
+			var versionStr string
+			if diags := gohcl.DecodeExpression(versionAttr.Expr, nil, &versionStr); diags.HasErrors() {
+				return diags
+			}
+			constraints, err := version.NewConstraint(versionStr)
+			if err != nil {
+				return err
+			}
+			module.version = constraints
+			module.versionAttr = versionAttr
+		}
+
 		if err := r.checkModule(runner, module, config); err != nil {
 			return err
 		}
@@ -71,28 +130,26 @@ func (r *TerraformModuleVersionRule) Check(runner *tflint.Runner) error {
 	return nil
 }
 
-func (r *TerraformModuleVersionRule) checkModule(runner *tflint.Runner, module *configs.ModuleCall, config TerraformModuleVersionRuleConfig) error {
-	log.Printf("[DEBUG] Walk `%s` attribute", module.Name+".source")
+func (r *TerraformModuleVersionRule) checkModule(runner *tflint.Runner, module *terraformModuleVersionRuleModuleCall, config TerraformModuleVersionRuleConfig) error {
+	log.Printf("[DEBUG] Walk `%s` attribute", module.name+".source")
 
-	source, err := addrs.ParseModuleSource(module.SourceAddrRaw)
+	_, err := tfaddr.ParseModuleSource(module.source)
 	if err != nil {
-		return err
+		// If parsing fails, the source does not expect to specify a version,
+		// such as local or remote. So instead of returning an error,
+		// it returns nil to stop the check.
+		return nil
 	}
 
-	switch source.(type) {
-	case addrs.ModuleSourceRegistry:
-		return r.checkVersion(runner, module, config)
-	}
-
-	return nil
+	return r.checkVersion(runner, module, config)
 }
 
-func (r *TerraformModuleVersionRule) checkVersion(runner *tflint.Runner, module *configs.ModuleCall, config TerraformModuleVersionRuleConfig) error {
-	if module.Version.Required == nil {
+func (r *TerraformModuleVersionRule) checkVersion(runner *tflint.Runner, module *terraformModuleVersionRuleModuleCall, config TerraformModuleVersionRuleConfig) error {
+	if module.version == nil {
 		runner.EmitIssue(
 			r,
-			fmt.Sprintf("module %q should specify a version", module.Name),
-			module.DeclRange,
+			fmt.Sprintf("module %q should specify a version", module.name),
+			module.block.DefRange,
 		)
 
 		return nil
@@ -102,21 +159,21 @@ func (r *TerraformModuleVersionRule) checkVersion(runner *tflint.Runner, module 
 		return nil
 	}
 
-	if len(module.Version.Required) > 1 {
+	if len(module.version) > 1 {
 		runner.EmitIssue(
 			r,
-			fmt.Sprintf("module %q should specify an exact version, but multiple constraints were found", module.Name),
-			module.Version.DeclRange,
+			fmt.Sprintf("module %q should specify an exact version, but multiple constraints were found", module.name),
+			module.versionAttr.Range,
 		)
 
 		return nil
 	}
 
-	if !exactVersionRegexp.MatchString(module.Version.Required[0].String()) {
+	if !exactVersionRegexp.MatchString(module.version[0].String()) {
 		runner.EmitIssue(
 			r,
-			fmt.Sprintf("module %q should specify an exact version, but a range was found", module.Name),
-			module.Version.DeclRange,
+			fmt.Sprintf("module %q should specify an exact version, but a range was found", module.name),
+			module.versionAttr.Range,
 		)
 	}
 
