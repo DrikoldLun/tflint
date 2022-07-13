@@ -78,6 +78,7 @@ func (r *TerraformAlphabeticOrderRule) checkAlphaOrder(runner *tflint.Runner, fi
 	return nil
 }
 
+// checkArgsAlphaOrder checks whether the arguments/attributes in a block are sorted in alphabetic order recursively
 func (r *TerraformAlphabeticOrderRule) checkArgsAlphaOrder(runner *tflint.Runner,
 	owner hclsyntax.Token, tokens hclsyntax.Tokens, startIndex int) int {
 	var lastIdentifierToken hclsyntax.Token
@@ -105,6 +106,7 @@ func (r *TerraformAlphabeticOrderRule) checkArgsAlphaOrder(runner *tflint.Runner
 	return -1
 }
 
+// isReceiver checks whether an identifier token is not on the right side of an expression
 func (r *TerraformAlphabeticOrderRule) isReceiver(tokens hclsyntax.Tokens, index int) bool {
 	if tokens[index].Type != hclsyntax.TokenIdent {
 		return false

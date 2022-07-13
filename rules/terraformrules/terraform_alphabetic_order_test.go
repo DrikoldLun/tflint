@@ -13,7 +13,7 @@ func Test_TerraformAlphabeticOrderRule(t *testing.T) {
 		Expected tflint.Issues
 	}{
 		{
-			Name: "",
+			Name: "simple block",
 			Content: `
 resource "azurerm_resource_group" "rg" {
   name     = "myTFResourceGroup"
@@ -65,6 +65,88 @@ resource "azurerm_resource_group" "rg" {
 					},
 				},
 			},
+		},
+		{
+			Name: "multiple blocks",
+			Content: `
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0.2"
+    }
+  }
+}
+
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "rg" {
+  name     = "myTFResourceGroup"
+  location = "westus2"
+  tags = {
+    Environment = "Terraform Getting Started"
+    Team = "DevOps"
+  }
+}
+
+resource "azurerm_virtual_network" "vnet" {
+  name                = "myTFVnet"
+  address_space       = ["10.0.0.0/16"]
+  location            = "westus2"
+  resource_group_name = azurerm_resource_group.rg.name
+}`,
+			Expected: tflint.Issues{
+				{
+					Rule:    NewTerraformAlphabeticOrderRule(),
+					Message: "Arguments `name` and `location` are not sorted in alphabetic order",
+					Range: hcl.Range{
+						Filename: "config.tf",
+						Start: hcl.Pos{
+							Line:   15,
+							Column: 1,
+						},
+						End: hcl.Pos{
+							Line:   15,
+							Column: 9,
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "comments",
+			Content: `
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0.2"
+    }
+  }
+}
+
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "rg" {
+  #name     = "myTFResourceGroup"
+  location = "westus2"
+  tags = {
+    Environment = "Terraform Getting Started"
+    Team = "DevOps"
+  }
+}
+
+resource "azurerm_virtual_network" "vnet" {
+  #name                = "myTFVnet"
+  #address_space       = ["10.0.0.0/16"]
+  location            = "westus2"
+  resource_group_name = azurerm_resource_group.rg.name
+}`,
+			Expected: tflint.Issues{},
 		},
 	}
 
