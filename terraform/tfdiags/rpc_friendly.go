@@ -4,7 +4,7 @@ import (
 	"encoding/gob"
 )
 
-type rpcFriendlyDiag struct {
+type rpcFriendlyDiagTflint struct {
 	Severity_ Severity
 	Summary_  string
 	Detail_   string
@@ -12,7 +12,7 @@ type rpcFriendlyDiag struct {
 	Context_  *SourceRange
 }
 
-// rpcFriendlyDiag transforms a given diagnostic so that is more friendly to
+// rpcFriendlyDiagTflint transforms a given diagnostic so that is more friendly to
 // RPC.
 //
 // In particular, it currently returns an object that can be serialized and
@@ -21,7 +21,7 @@ type rpcFriendlyDiag struct {
 func makeRPCFriendlyDiag(diag Diagnostic) Diagnostic {
 	desc := diag.Description()
 	source := diag.Source()
-	return &rpcFriendlyDiag{
+	return &rpcFriendlyDiagTflint{
 		Severity_: diag.Severity(),
 		Summary_:  desc.Summary,
 		Detail_:   desc.Detail,
@@ -30,30 +30,30 @@ func makeRPCFriendlyDiag(diag Diagnostic) Diagnostic {
 	}
 }
 
-func (d *rpcFriendlyDiag) Severity() Severity {
+func (d *rpcFriendlyDiagTflint) Severity() Severity {
 	return d.Severity_
 }
 
-func (d *rpcFriendlyDiag) Description() Description {
+func (d *rpcFriendlyDiagTflint) Description() Description {
 	return Description{
 		Summary: d.Summary_,
 		Detail:  d.Detail_,
 	}
 }
 
-func (d *rpcFriendlyDiag) Source() Source {
+func (d *rpcFriendlyDiagTflint) Source() Source {
 	return Source{
 		Subject: d.Subject_,
 		Context: d.Context_,
 	}
 }
 
-func (d rpcFriendlyDiag) FromExpr() *FromExpr {
+func (d rpcFriendlyDiagTflint) FromExpr() *FromExpr {
 	// RPC-friendly diagnostics cannot preserve expression information because
 	// expressions themselves are not RPC-friendly.
 	return nil
 }
 
 func init() {
-	gob.Register((*rpcFriendlyDiag)(nil))
+	gob.Register((*rpcFriendlyDiagTflint)(nil))
 }

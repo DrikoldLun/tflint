@@ -105,3 +105,9 @@ func Test_NewRules(t *testing.T) {
 		}
 	}
 }
+
+//func Test_Lun(t *testing.T) {
+//	schemaTest := provider.AzProvider.ResourcesMap["azurerm_container_group"].Schema["container"]
+//	var a = schemaTest.Elem.(*schema.Resource)
+//	fmt.Println(a.Schema)
+//}
